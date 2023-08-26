@@ -1,4 +1,4 @@
-from ransac import ransac
+from ransac import ransac, ransac_with_early_stopping
 from least_median_of_squares import least_median_squares
 from iteratively_reweighted_least_squares import fit_plane_IRLS
 from m_estimator import fit_plane_m_estimator
@@ -51,8 +51,9 @@ if __name__ == "__main__":
         0. Theil-Sen Estimator: O(K x M)
         1. Iteratively Re-weighted Least Squares: O(K x N x M x M)
         2. M-Estimator: O(K x N x M x M)
-        3. Random Sample Consensus: O(K x N x (M + M x M))
-        4. Least Median Of Squares: O(K x N x (M + log(N))
+        3. Random Sample Consensus with early stopping O(K x N x (M + M x M)), N ~ log(1 - p) / log(1 - (1 - e)^3)
+        4. Random Sample Consensus: O(K x N x (M + M x M))
+        5. Least Median Of Squares: O(K x N x (M + log(N))
 
         Robustness to Outliers:
         Most Robust to Outliers: LMEDS and RANSAC are generally considered the most robust to outliers.
@@ -88,6 +89,21 @@ if __name__ == "__main__":
         c=normal_ransac[2], 
         d=d_ransac, 
         title="RANSAC"
+    )
+
+    # Run RANSAC with early stopping
+    (normal_ransac, d_ransac), best_inliers = ransac_with_early_stopping(
+        points_with_outliers, 
+        threshold=THRESHOLD_RANSAC, 
+        iterations=NUMBER_OF_ITERATIONS_RANSAC
+    )
+    plot_results(
+        points_with_outliers=points_with_outliers, 
+        a=normal_ransac[0], 
+        b=normal_ransac[1], 
+        c=normal_ransac[2], 
+        d=d_ransac, 
+        title="RANSAC with early stopping"
     )
 
     # Run LMedS
