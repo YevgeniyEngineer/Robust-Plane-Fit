@@ -7,6 +7,7 @@ find_package(Eigen3 3.4 REQUIRED NO_MODULE)
 add_library(${PROJECT_NAME}
     INTERFACE
     ./src/iteratively_reweighted_least_squares.hpp
+    ./src/m_estimator.hpp
 )
 
 target_link_libraries(${PROJECT_NAME}

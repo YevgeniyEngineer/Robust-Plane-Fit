@@ -1,4 +1,5 @@
 #include "iteratively_reweighted_least_squares.hpp"
+#include "m_estimator.hpp"
 #include <Eigen/src/Core/util/Constants.h>
 #include <chrono>
 #include <cstdint>
@@ -46,6 +47,10 @@ int main()
 
     using FloatType = float;
 
+    constexpr FloatType THRESHOLD_M_ESTIMATOR = 1;
+    constexpr FloatType ALPHA_M_ESTIMATOR = static_cast<FloatType>(0.01);
+    constexpr FloatType CONVERGENCE_TOLERANCE_M_ESTIMATOR = 1e-5;
+
     try
     {
         // Generate 100 random points on a horizontal plane with a noise level of 1.0,
@@ -53,6 +58,7 @@ int main()
         const Eigen::Matrix<FloatType, Eigen::Dynamic, 3> points =
             generateNoisyPlanePoints<FloatType>(NUMBER_OF_POINTS, 1.0, 6.0, 0.5);
 
+        // Iterative Reweighted Least Squares
         for (auto timing_iteration = 0; timing_iteration < TIMING_ITERATIONS; ++timing_iteration)
         {
             auto t1 = std::chrono::high_resolution_clock::now();
@@ -60,6 +66,24 @@ int main()
             // Fit a plane to the points
             auto result =
                 plane_fit::fitPlaneWithIterativelyReweightedLeastSquares<FloatType>(points, NUMBER_OF_ITERATIONS);
+
+            auto t2 = std::chrono::high_resolution_clock::now();
+
+            std::cout << "Plane coefficients (a, b, c, d): " << result.first.transpose() << " " << result.second
+                      << std::endl;
+            std::cout << "Elapsed time [microseconds]: "
+                      << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() << std::endl;
+        }
+
+        // M-Estimator
+        for (auto timing_iteration = 0; timing_iteration < TIMING_ITERATIONS; ++timing_iteration)
+        {
+            auto t1 = std::chrono::high_resolution_clock::now();
+
+            // Fit a plane to the points
+            auto result =
+                plane_fit::fitPlaneWithMEstimator<FloatType>(points, NUMBER_OF_ITERATIONS, THRESHOLD_M_ESTIMATOR,
+                                                             ALPHA_M_ESTIMATOR, CONVERGENCE_TOLERANCE_M_ESTIMATOR);
 
             auto t2 = std::chrono::high_resolution_clock::now();
 
