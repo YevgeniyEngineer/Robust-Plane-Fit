@@ -42,16 +42,16 @@ std::pair<Eigen::Matrix<FloatType, 3, 1>, FloatType> fitPlaneWithMEstimator(
     for (std::uint32_t i = 0; i < iterations; ++i)
     {
         // Calculate the residuals
-        residuals.array() = plane_coefficients[0] * points.col(0).array() +
-                            plane_coefficients[1] * points.col(1).array() +
-                            plane_coefficients[2] * points.col(2).array() - plane_coefficients[3];
+        residuals.array() =
+            (plane_coefficients[0] * points.col(0).array() + plane_coefficients[1] * points.col(1).array() +
+             plane_coefficients[2] * points.col(2).array() - plane_coefficients[3])
+                .abs();
 
         // Update the mask based on the residuals
-        mask = (residuals.array().abs() > threshold).template cast<bool>();
+        mask = (residuals.array() > threshold).template cast<bool>();
 
         // Calculate Huber weights for each point
-        W.diagonal().array() =
-            mask.select((threshold / (residuals.array().abs() + epsilon)), static_cast<FloatType>(1.0));
+        W.diagonal().array() = mask.select((threshold / (residuals.array() + epsilon)), static_cast<FloatType>(1.0));
 
         // Update the parameters using SVD
         ATW.noalias() = A.transpose() * W; // [4 x num_points] x [num_points x num_points] = [4 x num_points]

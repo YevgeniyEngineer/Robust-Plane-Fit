@@ -46,7 +46,7 @@ int main()
 {
     constexpr std::int32_t NUMBER_OF_POINTS = 120'000;
     constexpr std::uint32_t NUMBER_OF_ITERATIONS_IRLS = 5;
-    constexpr std::uint32_t TIMING_ITERATIONS = 5;
+    constexpr std::uint32_t TIMING_ITERATIONS = 100;
 
     using FloatType = float;
 
