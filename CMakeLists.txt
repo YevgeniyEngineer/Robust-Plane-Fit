@@ -8,6 +8,9 @@ add_library(${PROJECT_NAME}
     INTERFACE
     ./src/iteratively_reweighted_least_squares.hpp
     ./src/m_estimator.hpp
+    ./src/random_sample_consensus.hpp
+    ./src/least_median_of_squares.hpp
+    ./src/theil_sen_estimator.hpp
 )
 
 target_link_libraries(${PROJECT_NAME}

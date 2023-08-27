@@ -1,6 +1,9 @@
 #include "iteratively_reweighted_least_squares.hpp"
+#include "least_median_of_squares.hpp"
 #include "m_estimator.hpp"
-#include <Eigen/src/Core/util/Constants.h>
+#include "random_sample_consensus.hpp"
+#include "theil_sen_estimator.hpp"
+
 #include <chrono>
 #include <cstdint>
 #include <iostream>
@@ -42,54 +45,114 @@ Eigen::Matrix<FloatType, Eigen::Dynamic, 3> generateNoisyPlanePoints(std::int32_
 int main()
 {
     constexpr std::int32_t NUMBER_OF_POINTS = 120'000;
-    constexpr std::uint32_t NUMBER_OF_ITERATIONS = 5;
-    constexpr std::uint32_t TIMING_ITERATIONS = 100;
+    constexpr std::uint32_t NUMBER_OF_ITERATIONS_IRLS = 5;
+    constexpr std::uint32_t TIMING_ITERATIONS = 5;
 
     using FloatType = float;
 
+    constexpr std::uint32_t NUMBER_OF_ITERATIONS_M_ESTIMATOR = 30;
     constexpr FloatType THRESHOLD_M_ESTIMATOR = 1;
     constexpr FloatType ALPHA_M_ESTIMATOR = static_cast<FloatType>(0.01);
     constexpr FloatType CONVERGENCE_TOLERANCE_M_ESTIMATOR = 1e-5;
+
+    constexpr FloatType TOLERANCE_RANSAC = 0.5;
+    constexpr std::uint32_t RANSAC_NUMBER_OF_ITERATIONS = 1000;
+    constexpr FloatType PROBABILITY_OF_SUCCESS_RANSAC = 0.999;
+
+    constexpr std::uint32_t NUMBER_OF_ITERATIONS_LMEDS = 1000;
+    constexpr FloatType PROBABILITY_OF_SUCCESS_LMEDS = 0.999;
+
+    constexpr std::uint32_t NUMBER_OF_ITERATIONS_THEIL_SEN = 2000;
 
     try
     {
         // Generate 100 random points on a horizontal plane with a noise level of 1.0,
         // sine amplitude of 2.0, and sine frequency of 0.5
         const Eigen::Matrix<FloatType, Eigen::Dynamic, 3> points =
-            generateNoisyPlanePoints<FloatType>(NUMBER_OF_POINTS, 1.0, 6.0, 0.5);
+            generateNoisyPlanePoints<FloatType>(NUMBER_OF_POINTS, 1.0, 1.0, 0.5);
 
-        // Iterative Reweighted Least Squares
+        // Iterative Reweighted Least Squares (Robust to large number of outliers, fast)
         for (auto timing_iteration = 0; timing_iteration < TIMING_ITERATIONS; ++timing_iteration)
         {
             auto t1 = std::chrono::high_resolution_clock::now();
 
             // Fit a plane to the points
             auto result =
-                plane_fit::fitPlaneWithIterativelyReweightedLeastSquares<FloatType>(points, NUMBER_OF_ITERATIONS);
+                plane_fit::fitPlaneWithIterativelyReweightedLeastSquares<FloatType>(points, NUMBER_OF_ITERATIONS_IRLS);
 
             auto t2 = std::chrono::high_resolution_clock::now();
 
             std::cout << "Plane coefficients (a, b, c, d): " << result.first.transpose() << " " << result.second
                       << std::endl;
-            std::cout << "Elapsed time [microseconds]: "
+            std::cout << "IRLS Plane Fit Elapsed time [microseconds]: "
                       << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() << std::endl;
         }
 
-        // M-Estimator
+        // M-Estimator (Robust to large number of outliers, extremely fast)
         for (auto timing_iteration = 0; timing_iteration < TIMING_ITERATIONS; ++timing_iteration)
         {
             auto t1 = std::chrono::high_resolution_clock::now();
 
             // Fit a plane to the points
-            auto result =
-                plane_fit::fitPlaneWithMEstimator<FloatType>(points, NUMBER_OF_ITERATIONS, THRESHOLD_M_ESTIMATOR,
-                                                             ALPHA_M_ESTIMATOR, CONVERGENCE_TOLERANCE_M_ESTIMATOR);
+            auto result = plane_fit::fitPlaneWithMEstimator<FloatType>(points, NUMBER_OF_ITERATIONS_M_ESTIMATOR,
+                                                                       THRESHOLD_M_ESTIMATOR, ALPHA_M_ESTIMATOR,
+                                                                       CONVERGENCE_TOLERANCE_M_ESTIMATOR);
 
             auto t2 = std::chrono::high_resolution_clock::now();
 
             std::cout << "Plane coefficients (a, b, c, d): " << result.first.transpose() << " " << result.second
                       << std::endl;
-            std::cout << "Elapsed time [microseconds]: "
+            std::cout << "M-Estimator Elapsed time [microseconds]: "
+                      << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() << std::endl;
+        }
+
+        // RANSAC (Not very accurate, relatively slow without early termination)
+        for (auto timing_iteration = 0; timing_iteration < TIMING_ITERATIONS; ++timing_iteration)
+        {
+            auto t1 = std::chrono::high_resolution_clock::now();
+
+            // Fit a plane to the points
+            auto result = plane_fit::fitPlaneWithRandomSampleConsensus(
+                points, TOLERANCE_RANSAC, RANSAC_NUMBER_OF_ITERATIONS, PROBABILITY_OF_SUCCESS_RANSAC);
+
+            auto t2 = std::chrono::high_resolution_clock::now();
+
+            std::cout << "Plane coefficients (a, b, c, d): " << result.first.transpose() << " " << result.second
+                      << std::endl;
+            std::cout << "RANSAC Elapsed time [microseconds]: "
+                      << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() << std::endl;
+        }
+
+        // LMedS (Can tolerate more noise than RANSAC, but still not accurate, and a lot slower)
+        for (auto timing_iteration = 0; timing_iteration < TIMING_ITERATIONS; ++timing_iteration)
+        {
+            auto t1 = std::chrono::high_resolution_clock::now();
+
+            // Fit a plane to the points
+            auto result = plane_fit::fitPlaneWithLeastMedianOfSquares(points, NUMBER_OF_ITERATIONS_LMEDS,
+                                                                      PROBABILITY_OF_SUCCESS_LMEDS);
+
+            auto t2 = std::chrono::high_resolution_clock::now();
+
+            std::cout << "Plane coefficients (a, b, c, d): " << result.first.transpose() << " " << result.second
+                      << std::endl;
+            std::cout << "LMedS Elapsed time [microseconds]: "
+                      << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() << std::endl;
+        }
+
+        // Theil-Sen (Worst performance for non-gaussian noise, susceptible to noise deviations)
+        for (auto timing_iteration = 0; timing_iteration < TIMING_ITERATIONS; ++timing_iteration)
+        {
+            auto t1 = std::chrono::high_resolution_clock::now();
+
+            // Fit a plane to the points
+            auto result = plane_fit::fitPlaneWithTheilSenEstimator(points, NUMBER_OF_ITERATIONS_THEIL_SEN);
+
+            auto t2 = std::chrono::high_resolution_clock::now();
+
+            std::cout << "Plane coefficients (a, b, c, d): " << result.first.transpose() << " " << result.second
+                      << std::endl;
+            std::cout << "Theil-Sen Elapsed time [microseconds]: "
                       << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() << std::endl;
         }
     }

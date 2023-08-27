@@ -12,7 +12,7 @@ namespace plane_fit
 template <typename FloatType>
 std::pair<Eigen::Matrix<FloatType, 3, 1>, FloatType> fitPlaneWithIterativelyReweightedLeastSquares(
     const Eigen::Matrix<FloatType, Eigen::Dynamic, 3> &points, std::uint32_t iterations = 10,
-    FloatType epsilon = static_cast<FloatType>(1e-6))
+    FloatType epsilon = static_cast<FloatType>(1e-6), FloatType convergence_tolerance = static_cast<FloatType>(1e-6))
 {
     using VectorType = Eigen::Matrix<FloatType, Eigen::Dynamic, 1>;
     using MatrixType = Eigen::Matrix<FloatType, Eigen::Dynamic, Eigen::Dynamic>;
@@ -25,7 +25,10 @@ std::pair<Eigen::Matrix<FloatType, 3, 1>, FloatType> fitPlaneWithIterativelyRewe
 
     // Initialize coefficients and weight matrix
     VectorType plane_coefficients(4);
+    VectorType old_plane_coefficients(4);
+
     plane_coefficients.setZero();
+    old_plane_coefficients.setZero();
 
     DiagonalMatrixType W(VectorType::Ones(points.rows()));
 
@@ -48,6 +51,14 @@ std::pair<Eigen::Matrix<FloatType, 3, 1>, FloatType> fitPlaneWithIterativelyRewe
 
         // Update weights
         W.diagonal().array() = 1.0 / ((points.col(2) - X * plane_coefficients).cwiseAbs().array() + epsilon);
+
+        // Check for convergence and possibly terminate early
+        if ((plane_coefficients - old_plane_coefficients).norm() < convergence_tolerance)
+        {
+            break;
+        }
+
+        old_plane_coefficients = plane_coefficients;
     }
 
     const Eigen::Matrix<FloatType, 3, 1> normal_vector = plane_coefficients.template head<3>();

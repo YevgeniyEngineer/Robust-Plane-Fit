@@ -26,9 +26,10 @@ std::pair<Eigen::Matrix<FloatType, 3, 1>, FloatType> fitPlaneWithMEstimator(
 
     Eigen::Matrix<FloatType, Eigen::Dynamic, 1> residuals(num_points);
     Eigen::Matrix<bool, Eigen::Dynamic, 1> mask(num_points);
-    Eigen::Matrix<FloatType, Eigen::Dynamic, 4> A(num_points, 4);
-    Eigen::DiagonalMatrix<FloatType, Eigen::Dynamic> W(num_points);
-    Eigen::Matrix<FloatType, 4, 4> ATW;
+    Eigen::Matrix<FloatType, Eigen::Dynamic, 4> A(num_points, 4); // [num_points x 4]
+    Eigen::DiagonalMatrix<FloatType, Eigen::Dynamic> W(
+        num_points);                    // [num_points x num_points] -> flattened [num_points]
+    Eigen::Matrix<FloatType, 4, 4> ATW; // [4 x 4]
 
     // Prepare design matrix A
     A.block(0, 0, num_points, 3) = points;
@@ -49,12 +50,18 @@ std::pair<Eigen::Matrix<FloatType, 3, 1>, FloatType> fitPlaneWithMEstimator(
         mask = (residuals.array().abs() > threshold).template cast<bool>();
 
         // Calculate Huber weights for each point
-        W.diagonal().array() = mask.select((threshold / (residuals.array().abs() + epsilon)), 1);
+        W.diagonal().array() =
+            mask.select((threshold / (residuals.array().abs() + epsilon)), static_cast<FloatType>(1.0));
 
         // Update the parameters using SVD
-        ATW.noalias() = A.transpose() * W;
-        svd.compute(ATW * A);
-        plane_coefficients = svd.solve(ATW * points.col(2));
+        ATW.noalias() = A.transpose() * W; // [4 x num_points] x [num_points x num_points] = [4 x num_points]
+
+        // Perform SVD decomposition of A^T x W x A
+        svd.compute(ATW * A); // Operate on [4 x num_points] x [num_points x 4] = [4 x 4]
+
+        // Compute solution to Ax = b, using current decomposition of A
+        // The result is [4 x 4] matrices U, S, V
+        plane_coefficients = svd.solve(ATW * points.col(2)); // Operate on [4 x num_points] x [num_points x 1] = [4 x 1]
 
         // Check for convergence
         if ((plane_coefficients - old_plane_coefficients).norm() < convergence_tolerance)
